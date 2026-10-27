@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { background: #f0f2f5; -webkit-text-size-adjust: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #2c2c2c; }
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+button { -webkit-tap-highlight-color: transparent; }
