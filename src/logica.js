@@ -4,17 +4,46 @@ import { CATALOGO, ESTADOS_IMPUESTO } from "./datos.js";
 export const sinAcentos = (t) =>
   (t || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-// Grupos que van AL FINAL de los resultados (la mercancía siempre primero)
+// Orden de los resultados por tipo de producto:
+//   0 = producto principal (la olla, la licuadora, el filtro que se vende)
+//   1 = accesorio o cartucho de un producto principal (jarras, conjuntos, cartuchos, prefiltros)
+//   2 = parte de reemplazo  ·  3 = material interno, premios, papelería
 const GRUPOS_SECUNDARIOS = ["Premiums", "Miscelaneos", "Literatura de Venta", "Materiales Clientes", "Suministros", "Ordenes de Compra", "Reclutamiento", "Kits Novato"];
+const GRUPOS_REPUESTO = ["Partes de Reemplazo"];
+// Accesorios y consumibles que la lista mete en Electrodomésticos o Filtración
+const ACCESORIOS = new Set([
+  // Licuadora Power Blender Max
+  "RP8217", "PE0050", "PE0051", "RP8218",
+  // Batidor Blender GO
+  "PE0028", "PE0029",
+  // Filtración: cartuchos, prefiltros, paquetes de reemplazo, válvulas y kits
+  "RP8200", "RP8202", "RP8203", "RP8204", "RP9003", "WF0075", "WF0080", "RP0140", "WF0382",
+  "WF0491", "WF0490", "WF0530", "RP4621", "WF0060", "RP6196", "RP6186", "WF0654",
+]);
+export const nivelProducto = (p) =>
+  GRUPOS_SECUNDARIOS.includes(p.g) ? 3 : GRUPOS_REPUESTO.includes(p.g) ? 2 : ACCESORIOS.has(p.c) ? 1 : 0;
+export const esPrincipal = (p) => nivelProducto(p) === 0;
 
 export const CATEGORIAS = Array.from(new Set(CATALOGO.map((p) => p.g))).sort((a, b) => a.localeCompare(b, "es"));
 
 // Texto de búsqueda precalculado una sola vez por producto
 const compacto = (t) => t.replace(/[^a-z0-9]/g, "");
-const INDICE = CATALOGO.map((p) => {
+const INDICE = CATALOGO.map((p, i) => {
   const hay = sinAcentos([p.c, p.n, p.f, p.k].filter(Boolean).join(" "));
-  return { p, hay, hayC: compacto(hay) };
+  const titulo = sinAcentos([p.n, p.f].filter(Boolean).join(" ")); // nombre + descripción (sin palabras clave)
+  const inicios = sinAcentos([p.n, p.f].filter(Boolean).join("|")).split("|").map((t) => t.trim());
+  return { p, i, hay, hayC: compacto(hay), titulo, inicios, codigo: sinAcentos(p.c) };
 });
+
+// Qué tan directo es el resultado (menor = más arriba), dentro del mismo tipo de producto:
+//   0 = el nombre empieza con lo que buscaste ("licuadora…")  ·  1 = está en el nombre/descripción
+//   2 = solo está en las palabras clave
+function relevancia(x, toks) {
+  if (!toks.length) return 0;
+  if (x.inicios.some((t) => t.startsWith(toks[0])) && toks.every((t) => x.titulo.includes(t))) return 0;
+  if (toks.every((t) => x.titulo.includes(t))) return 1;
+  return 2;
+}
 
 // Búsqueda abierta: cada palabra puede estar en código, nombre, descripción o palabras clave, sin acentos.
 // "presion 10" encuentra "Olla de presión de 10 litros".
@@ -31,9 +60,15 @@ export function filtrarCatalogo(q, cat = "ALL") {
       const tc = compacto(t); // solo si la palabra trae signos por dentro
       return tc !== t && tc.length > 0 && hayC.includes(tc);
     });
-  }).map((x) => x.p);
-  const sec = (p) => (GRUPOS_SECUNDARIOS.includes(p.g) ? 1 : 0);
-  return out.sort((a, b) => sec(a) - sec(b));
+  });
+  // Orden: 1) el código exacto que escribiste  2) productos principales antes que repuestos y material interno
+  //        3) los que lo dicen en el nombre antes que los que solo lo tienen en palabras clave  4) orden de la lista
+  const exacto = toks.length === 1 ? toks[0] : null;
+  const clave = (x) => [x.codigo === exacto ? 0 : 1, nivelProducto(x.p), relevancia(x, toks), x.i];
+  return out
+    .map((x) => ({ x, k: clave(x) }))
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2] || a.k[3] - b.k[3])
+    .map(({ x }) => x.p);
 }
 
 // Número seguro: vacío, texto o negativo → 0

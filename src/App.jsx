@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Search, Check, Star, Calculator, ScanSearch } from "lucide-react";
 import { CATALOGO } from "./datos.js";
-import { CATEGORIAS, filtrarCatalogo, calcular, amortizar, fmtC, ESTADOS_IMPUESTO } from "./logica.js";
+import { CATEGORIAS, filtrarCatalogo, esPrincipal, calcular, amortizar, fmtC, ESTADOS_IMPUESTO } from "./logica.js";
 
 const TC = {
   bg: "#f0f2f5", panel: "#ffffff", border: "#d0d4dc",
@@ -81,7 +81,15 @@ function BuscadorCodigos() {
             <span className="flex-1 min-w-0">
               <span className="block text-[13px] font-bold leading-snug" style={{ color: TC.text }}>{p.f || p.n}</span>
               {p.f && p.f !== p.n && <span className="block text-[10px] mt-0.5" style={{ color: TC.mut }}>{p.n}</span>}
-              <span className="block text-[10px] font-black uppercase mt-0.5" style={{ color: TC.blueMid, letterSpacing: ".08em" }}>{p.g}</span>
+              <span className="flex flex-wrap items-center gap-1.5 mt-1">
+                {esPrincipal(p) && (
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded"
+                    style={{ background: "#fdf3d7", color: "#8a6100", letterSpacing: ".06em" }}>
+                    <Star size={9} fill="currentColor" />Principal
+                  </span>
+                )}
+                <span className="text-[10px] font-black uppercase" style={{ color: TC.blueMid, letterSpacing: ".08em" }}>{p.g}</span>
+              </span>
             </span>
           </button>
         ))}
