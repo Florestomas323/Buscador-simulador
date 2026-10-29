@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Search, Check, Star, Calculator, ScanSearch } from "lucide-react";
 import { CATALOGO } from "./datos.js";
-import { CATEGORIAS, filtrarCatalogo, esPrincipal, calcular, amortizar, fmtC, ESTADOS_IMPUESTO } from "./logica.js";
+import { CATEGORIAS, filtrarCatalogo, esPrincipal, calcular, amortizar, fmtC, ESTADOS_IMPUESTO, precioDesdeTotal, ENVIO_PCT, DEPOSITOS_SUGERIDOS } from "./logica.js";
 
 const TC = {
   bg: "#f0f2f5", panel: "#ffffff", border: "#d0d4dc",
@@ -110,12 +110,13 @@ function Fila({ l, v, strong, pale, neg }) {
     </div>
   );
 }
-function CampoDinero({ value, onChange, chico }) {
+function CampoDinero({ value, onChange, chico, activo }) {
   return (
     <div className="relative">
       <span className={"absolute top-1/2 -translate-y-1/2 font-black " + (chico ? "left-2.5 text-sm" : "left-3")} style={{ color: TC.blueMid }}>$</span>
       <input type="number" inputMode="decimal" min="0" step="0.01" value={value} onChange={(e) => onChange(e.target.value)} placeholder="0.00"
-        className={"w-full rounded-lg outline-none font-bold " + (chico ? "pl-6 pr-2 py-2 text-base" : "pl-7 pr-3 py-2.5 text-base")} style={inp} />
+        className={"w-full rounded-lg outline-none font-bold " + (chico ? "pl-6 pr-2 py-2 text-base" : "pl-7 pr-3 py-2.5 text-base")}
+        style={activo === false ? { ...inp, background: "#f7f8fa", color: "#6b7280", borderStyle: "dashed" } : activo ? { ...inp, borderColor: TC.blueMid } : inp} />
     </div>
   );
 }
@@ -129,9 +130,12 @@ const Ayuda = ({ t }) => <div className="text-[11px] mt-1" style={{ color: TC.mu
 const ESTADOS_ORDEN = Object.entries(ESTADOS_IMPUESTO).sort((a, b) => a[1][0].localeCompare(b[1][0]));
 
 function SimuladorCompra() {
-  const [precio, setPrecio] = useState("");
+  // Precio: se escribe el del producto O el total (con envío y taxes); el otro se calcula
+  const [modoPrecio, setModoPrecio] = useState("producto"); // 'producto' | 'total'
+  const [precioTxt, setPrecioTxt] = useState("");
+  const [totalTxt, setTotalTxt] = useState("");
   const [estado, setEstado] = useState("TX");
-  const [envio, setEnvio] = useState("");
+  const [envioTxt, setEnvioTxt] = useState("");
   const [envioManual, setEnvioManual] = useState(false);
   const [depPct, setDepPct] = useState("5");
   const [depAmt, setDepAmt] = useState("");
@@ -139,15 +143,30 @@ function SimuladorCompra() {
   const [balance, setBalance] = useState("");
   const [pagoCustom, setPagoCustom] = useState("");
 
-  const r = calcular({ precio, envio, estado, depMode, depPct, depAmt, balance });
-  const custom = useMemo(() => amortizar(r.financeTotal, pagoCustom, r.deposito), [pagoCustom, r.financeTotal, r.deposito]);
+  const envioFijo = envioManual ? envioTxt : null;
+  const precioNum = modoPrecio === "total" ? precioDesdeTotal(totalTxt, estado, envioFijo) : parseFloat(precioTxt) || 0;
+  const envioNum = envioManual ? parseFloat(envioTxt) || 0 : precioNum * ENVIO_PCT;
 
-  const envioAuto = (v) => { const p = parseFloat(v) || 0; return p > 0 ? (p * 0.05).toFixed(2) : ""; };
-  const cambiarPrecio = (v) => { setPrecio(v); if (!envioManual) setEnvio(envioAuto(v)); };
+  const r = calcular({ precio: precioNum, envio: envioNum, estado, depMode, depPct, depAmt, balance });
+  const custom = useMemo(() => amortizar(r.financeTotal, pagoCustom, r.deposito, r.interes), [pagoCustom, r.financeTotal, r.deposito, r.interes]);
+
+  // Lo que se ve en cada campo: el que escribiste tal cual; el otro, calculado
+  const precioMostrar = modoPrecio === "producto" ? precioTxt : precioNum > 0 ? precioNum.toFixed(2) : "";
+  const totalMostrar = modoPrecio === "total" ? totalTxt : r.totalVenta > 0 ? r.totalVenta.toFixed(2) : "";
+  const envioMostrar = envioManual ? envioTxt : precioNum > 0 ? envioNum.toFixed(2) : "";
+  const totalImposible = modoPrecio === "total" && parseFloat(totalTxt) > 0 && precioNum <= 0;
+
+  const cambiarPrecio = (v) => { setPrecioTxt(v); setModoPrecio("producto"); };
+  const cambiarTotal = (v) => { setTotalTxt(v); setModoPrecio("total"); };
+  // Al cambiar de estado se mantiene el PRECIO DEL PRODUCTO (el total sube o baja con el tax)
+  const cambiarEstado = (e) => {
+    if (modoPrecio === "total" && precioNum > 0) { setPrecioTxt(precioNum.toFixed(2)); setModoPrecio("producto"); }
+    setEstado(e);
+  };
   // Si borran el envío, vuelve a calcularse solo al 5%
   const cambiarEnvio = (v) => {
-    if (v === "") { setEnvioManual(false); setEnvio(envioAuto(precio)); return; }
-    setEnvio(v); setEnvioManual(true);
+    if (v === "") { setEnvioManual(false); setEnvioTxt(""); return; }
+    setEnvioTxt(v); setEnvioManual(true);
   };
   const cambiarPct = (v) => { setDepPct(v); setDepMode("pct"); };
   const cambiarAmt = (v) => { setDepAmt(v); setDepMode("amt"); };
@@ -156,6 +175,8 @@ function SimuladorCompra() {
   const pctTexto = depMode === "pct" ? depPct : r.pctReal.toFixed(1);
   const amtTexto = depMode === "amt" ? depAmt : r.deposito > 0 ? r.deposito.toFixed(2) : "";
   const infinito = custom && custom.infinito;
+  const pctActivo = depMode === "pct" ? parseFloat(depPct) : null;
+  const tasaTxt = ESTADOS_IMPUESTO[estado] ? ESTADOS_IMPUESTO[estado][1].toFixed(2) + "%" : "0%";
 
   return (
     <div className="space-y-3">
@@ -163,25 +184,36 @@ function SimuladorCompra() {
       <div className="rounded-2xl p-5 space-y-4" style={{ background: TC.panel, border: "1px solid " + TC.border, boxShadow: TC.glow }}>
         <div>
           <div className="text-lg font-bold" style={{ fontFamily: TC.serif, color: TC.blue }}>Configura tu Compra</div>
-          <div className="text-xs" style={{ color: TC.mut }}>Ingresa los datos para calcular el financiamiento</div>
-        </div>
-        <div>
-          <Etiqueta t="Precio del Producto" />
-          <CampoDinero value={precio} onChange={cambiarPrecio} />
+          <div className="text-xs" style={{ color: TC.mut }}>Escribe el precio del producto o el precio total</div>
         </div>
         <div>
           <Etiqueta t="Estado de Envío" />
-          <select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-base font-bold outline-none" style={inp}>
+          <select value={estado} onChange={(e) => cambiarEstado(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-base font-bold outline-none" style={inp}>
             {ESTADOS_ORDEN.map(([k, [n, t]]) => <option key={k} value={k}>{n} ({t.toFixed(2)}%)</option>)}
           </select>
         </div>
-        <div>
-          <Etiqueta t="Costo de Envío" nota="promedio 5%, editable" />
-          <CampoDinero value={envio} onChange={cambiarEnvio} />
-          <Ayuda t={envioManual ? "Editado a mano · bórralo para volver al 5% automático" : "Se calcula automático al 5% del precio · puedes editarlo"} />
+        <div className="rounded-xl p-3 space-y-3" style={{ background: TC.bg, border: "1px solid " + TC.border }}>
+          <div>
+            <Etiqueta t="Precio del Producto" nota={modoPrecio === "total" ? "calculado del total" : "sin envío ni taxes"} />
+            <CampoDinero value={precioMostrar} onChange={cambiarPrecio} activo={modoPrecio === "producto"} />
+          </div>
+          <div>
+            <Etiqueta t="Precio Total" nota="incluye taxes y envío" />
+            <CampoDinero value={totalMostrar} onChange={cambiarTotal} activo={modoPrecio === "total"} />
+            {totalImposible
+              ? <div className="text-[11px] mt-1 font-bold" style={{ color: TC.red }}>El envío escrito a mano es mayor que el total; revisa el envío.</div>
+              : <Ayuda t={modoPrecio === "total"
+                  ? `Calculando hacia atrás: el total ya trae envío y tax de ${tasaTxt}, por eso el producto sale más bajo`
+                  : "Si el cliente te da el precio final, escríbelo aquí y se calcula el precio del producto"} />}
+          </div>
         </div>
         <div>
-          <Etiqueta t="Depósito Inicial" nota="sugerido 5%" />
+          <Etiqueta t="Costo de Envío" nota="promedio 5%, editable" />
+          <CampoDinero value={envioMostrar} onChange={cambiarEnvio} />
+          <Ayuda t={envioManual ? "Editado a mano · bórralo para volver al 5% automático" : "Se calcula automático al 5% del precio del producto · puedes editarlo"} />
+        </div>
+        <div>
+          <Etiqueta t="Depósito Inicial" nota="5% por defecto, editable" />
           <div className="inline-block text-[13px] font-black text-white px-3 py-1 rounded-md mb-2" style={{ background: TC.blue }}>
             {Math.round(r.pctReal)}% · {fmtC(r.deposito)}
           </div>
@@ -198,9 +230,25 @@ function SimuladorCompra() {
               <CampoDinero value={amtTexto} onChange={cambiarAmt} chico />
             </div>
           </div>
+          <div className="mt-3">
+            <div className="text-[11px] font-black mb-1.5" style={{ color: TC.green }}>Depósitos sugeridos</div>
+            <div className="grid grid-cols-3 gap-2">
+              {DEPOSITOS_SUGERIDOS.map((pc) => {
+                const on = pctActivo === pc;
+                const monto = calcular({ precio: precioNum, envio: envioNum, estado, depMode: "pct", depPct: pc }).deposito;
+                return (
+                  <button key={pc} onClick={() => cambiarPct(String(pc))} className="rounded-xl py-2 text-center transition active:scale-95"
+                    style={on ? { background: TC.green, color: "#fff", border: "2px solid " + TC.green } : { background: "#e9f7ef", color: TC.green, border: "2px solid #9fd8b6" }}>
+                    <div className="text-[15px] font-black leading-tight">{pc}%</div>
+                    <div className="text-[11px] font-bold" style={{ opacity: on ? 0.9 : 0.8 }}>{monto > 0 ? fmtC(monto) : "—"}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {r.depositoExcede
             ? <div className="text-[11px] mt-1 font-bold" style={{ color: TC.red }}>El depósito no puede pasar del Total de Venta ({fmtC(r.totalVenta)}); se toma ese máximo.</div>
-            : <Ayuda t="Slider · % · o monto en $ — los tres se sincronizan" />}
+            : <Ayuda t="El depósito por % se redondea al dólar de arriba · slider, % y $ se sincronizan" />}
         </div>
         <div>
           <Etiqueta t="Balance Pendiente" nota="deuda anterior del cliente" />
@@ -257,7 +305,7 @@ function SimuladorCompra() {
               </div>
             )}
           </div>
-          <div className="text-[10px] mt-2 text-center" style={{ color: TC.mut }}>Interés simulado: 1.5% mensual sobre saldo decreciente</div>
+          <div className="text-[10px] mt-2 text-center" style={{ color: TC.mut }}>Interés simulado: {(r.interes * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}% mensual sobre saldo decreciente{estado === "NV" ? " (Nevada)" : ""}</div>
         </div>
         <div className="text-[10px] mt-3 text-center italic" style={{ color: TC.mut }}>Los montos son una estimación con fines informativos. Los impuestos pueden variar según condado.</div>
       </div>

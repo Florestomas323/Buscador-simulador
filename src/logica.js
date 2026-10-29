@@ -77,14 +77,45 @@ export const num = (v) => {
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
+export const TASA_MENSUAL = 0.015;
+
+// Pago mensual por cada $1 financiado, a `tasa` mensual durante `meses`
+export const factorAmortizacion = (tasa, meses) => tasa / (1 - Math.pow(1 + tasa, -meses));
+
+// Planes fijos. 32, 24 y 12 meses usan los factores de siempre (amortización al 1.5% redondeada).
+// 18 meses usa el factor EXACTO al 1.5% (6.38%): redondeado a 6% no alcanzaría a pagar la deuda.
 export const PLANES = [
   { meses: 32, factor: 0.04, destaca: true },
   { meses: 24, factor: 0.05 },
-  { meses: 16, factor: 0.07 },
+  { meses: 18, factor: factorAmortizacion(TASA_MENSUAL, 18) },
   { meses: 12, factor: 0.09 },
 ];
 
-export const TASA_MENSUAL = 0.015;
+export const ENVIO_PCT = 0.05;              // envío automático: 5% del precio del producto
+export const DEPOSITOS_SUGERIDOS = [10, 15, 20];
+
+// Impuesto del estado como fracción (8.25% → 0.0825)
+export const tasaImpuesto = (estado) => (ESTADOS_IMPUESTO[estado] ? ESTADOS_IMPUESTO[estado][1] : 0) / 100;
+
+/**
+ * Precio del producto a partir del PRECIO TOTAL (que ya incluye envío y taxes).
+ *   envío automático (5%):  total = precio × 1.05 × (1 + tax)   →  precio = total ÷ (1.05 × (1 + tax))
+ *   envío escrito a mano:   total = (precio + envío) × (1 + tax) →  precio = total ÷ (1 + tax) − envío
+ */
+export function precioDesdeTotal(total, estado, envioManual = null) {
+  const T = num(total);
+  const t = tasaImpuesto(estado);
+  const p = envioManual == null ? T / ((1 + ENVIO_PCT) * (1 + t)) : T / (1 + t) - num(envioManual);
+  return Math.max(0, p);
+}
+
+// Depósito por porcentaje: siempre en dólares cerrados, redondeado hacia arriba ($56.83 → $57)
+export const redondearDeposito = (monto) => (monto > 0 ? Math.ceil(monto - 1e-6) : 0);
+
+// Estados con interés mensual propio. En esos estados TODOS los planes fijos se recalculan
+// con la fórmula de amortización exacta a esa tasa.
+export const INTERES_POR_ESTADO = { NV: 0.02 };
+export const interesMensual = (estado) => INTERES_POR_ESTADO[estado] ?? TASA_MENSUAL;
 
 /**
  * Cálculo completo del simulador (misma fórmula que ImpactOS).
@@ -94,34 +125,36 @@ export function calcular({ precio, envio, estado, depMode, depPct, depAmt, balan
   const nPrecio = num(precio);
   const nEnvio = num(envio);
   const nBalance = num(balance);
-  const tasa = (ESTADOS_IMPUESTO[estado] ? ESTADOS_IMPUESTO[estado][1] : 0) / 100;
+  const tasa = tasaImpuesto(estado);
   const subtotal = nPrecio + nEnvio;
   const impuesto = subtotal * tasa;
   const totalVenta = subtotal + impuesto;
   // Depósito: base = Total de Venta SOLAMENTE (el balance no afecta el depósito)
-  const pedido = depMode === "amt" ? num(depAmt) : totalVenta * (Math.min(100, num(depPct)) / 100);
+  // Por porcentaje se redondea a dólares cerrados; un monto escrito a mano se respeta tal cual
+  const pedido = depMode === "amt" ? num(depAmt) : redondearDeposito(totalVenta * (Math.min(100, num(depPct)) / 100));
   const deposito = Math.min(pedido, totalVenta);
   const depositoExcede = pedido > totalVenta + 0.005;
   const pctReal = totalVenta > 0 ? (deposito / totalVenta) * 100 : 0;
   const financeSub = Math.max(0, totalVenta - deposito);
   const financeTotal = financeSub + nBalance;
-  const planes = PLANES.map((pl) => ({
-    ...pl,
-    pago: financeTotal * pl.factor,
-    total: financeTotal * pl.factor * pl.meses + deposito,
-  }));
-  return { nPrecio, nEnvio, nBalance, tasa, subtotal, impuesto, totalVenta, deposito, depositoExcede, pctReal, financeSub, financeTotal, planes };
+  const interes = interesMensual(estado);
+  const propio = estado in INTERES_POR_ESTADO;
+  const planes = PLANES.map((pl) => {
+    const factor = propio ? factorAmortizacion(interes, pl.meses) : pl.factor;
+    return { ...pl, factor, pago: financeTotal * factor, total: financeTotal * factor * pl.meses + deposito };
+  });
+  return { nPrecio, nEnvio, nBalance, tasa, interes, subtotal, impuesto, totalVenta, deposito, depositoExcede, pctReal, financeSub, financeTotal, planes };
 }
 
-/** Pago personalizado — amortización 1.5% mensual sobre saldo decreciente. */
-export function amortizar(financeTotal, pagoMensual, deposito = 0) {
+/** Pago personalizado — amortización sobre saldo decreciente (1.5% mensual general; Nevada 2%). */
+export function amortizar(financeTotal, pagoMensual, deposito = 0, tasa = TASA_MENSUAL) {
   const pago = num(pagoMensual);
   const MAX = 600;
   if (financeTotal <= 0 || pago <= 0) return null;
-  if (pago <= financeTotal * TASA_MENSUAL) return { infinito: true };
+  if (pago <= financeTotal * tasa) return { infinito: true };
   let saldo = financeTotal, meses = 0, totalPagado = 0, totalInteres = 0, ultimo = 0;
   while (saldo > 0.005 && meses < MAX) {
-    const interes = saldo * TASA_MENSUAL;
+    const interes = saldo * tasa;
     totalInteres += interes;
     saldo += interes;
     meses++;
