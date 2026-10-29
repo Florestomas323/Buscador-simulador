@@ -10,3 +10,8 @@ Mini app con dos funciones, extraídas de ImpactOS:
 3. Deploy. No necesita variables de entorno ni Firebase.
 
 Archivos: `src/datos.js` (catálogo e impuestos), `src/logica.js` (cálculos), `src/App.jsx` (pantallas).
+
+**Simulador (oct-2026):**
+- Planes: 32, 24, 18 y 12 meses. 18 meses usa el factor exacto al 1.5% (6.38%); en Nevada todos los planes al 2% exacto.
+- Precio: se escribe el *precio del producto* (se suman envío 5% y taxes) o el *precio total* (ya incluye envío y taxes; el producto se calcula hacia atrás). Al cambiar de estado se mantiene el precio del producto.
+- Depósito: 5% por defecto y editable; botones verdes sugeridos 10%, 15% y 20%. El depósito por % se redondea al dólar de arriba.
