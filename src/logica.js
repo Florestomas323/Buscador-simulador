@@ -182,11 +182,11 @@ export const GRUPOS_PRECIOS = Array.from(new Set(PRECIOS.map((x) => x.g)));
 
 // Descuento por paquete (2 o más productos), sobre la suma de precios de lista antes de tax y envío
 export const DESCUENTOS_PAQUETE = [
-  { min: 4000, pct: 20 },
-  { min: 3000, pct: 15 },
-  { min: 2000, pct: 10 },
-  { min: 1000, pct: 5 },
+  { min: 4001, max: null, pct: 15 },
+  { min: 2501, max: 4000, pct: 10 },
+  { min: 1000, max: 2500, pct: 5 },
 ];
+export const DESCUENTO_MAXIMO = Math.max(...DESCUENTOS_PAQUETE.map((d) => d.pct));
 export const pctPaquete = (suma, unidades) => {
   if (unidades < 2) return 0;
   const r = DESCUENTOS_PAQUETE.find((d) => suma >= d.min);
