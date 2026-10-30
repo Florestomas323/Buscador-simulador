@@ -85,12 +85,12 @@ export const factorAmortizacion = (tasa, meses) => tasa / (1 - Math.pow(1 + tasa
 
 // Planes fijos. 32, 24 y 12 meses usan los factores de siempre (amortización al 1.5% redondeada).
 // 18 meses usa el factor EXACTO al 1.5% (6.38%): redondeado a 6% no alcanzaría a pagar la deuda.
-// destaca = plan recomendado (verde) · minimo = pago mínimo, no recomendado (amarillo)
+// destaca = plan recomendado (verde) · minimo = pago mínimo, no recomendado (aviso en gris, sin color)
 export const PLANES = [
   { meses: 32, factor: 0.04, minimo: true },
   { meses: 24, factor: 0.05 },
   { meses: 18, factor: factorAmortizacion(TASA_MENSUAL, 18), destaca: true },
-  { meses: 12, factor: 0.09 },
+  { meses: 12, factor: 0.09, destaca: true },
 ];
 
 // Pago mensual en dólares cerrados, redondeado hacia arriba ($68.89 → $69) para que siempre alcance

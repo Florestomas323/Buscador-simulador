@@ -520,15 +520,14 @@ function SimuladorCompra({ carga }) {
         <div className="text-[11px] font-black uppercase tracking-widest mt-5 mb-2" style={{ color: TC.mut }}>Opciones de Financiamiento</div>
         <div className="grid grid-cols-2 gap-2">
           {r.planes.map((pl) => {
-            // Recomendado = verde · Pago mínimo = amarillo · resto = blanco
+            // Recomendados (18 y 12) = verde · resto = blanco · el de 32 solo lleva el aviso en gris
             const caja = pl.destaca ? { border: "2px solid " + TC.green, background: "#e9f7ef" }
-              : pl.minimo ? { border: "2px solid #e0b100", background: "#fff8db" }
               : { border: "1px solid " + TC.border, background: "#fff" };
-            const colorPago = pl.destaca ? TC.green : pl.minimo ? "#8a6100" : TC.blue;
+            const colorPago = pl.destaca ? TC.green : TC.blue;
             return (
             <div key={pl.meses} className="rounded-xl p-3 text-center" style={caja}>
               {pl.destaca && <div className="text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1" style={{ color: TC.green }}><Star size={10} fill="currentColor" />Recomendado</div>}
-              {pl.minimo && <div className="text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 leading-tight" style={{ color: "#8a6100" }}><AlertTriangle size={10} />Pago mínimo · No recomendado</div>}
+              {pl.minimo && <div className="text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 leading-tight" style={{ color: TC.mut }}><AlertTriangle size={10} />Pago mínimo · No recomendado</div>}
               <div className="text-[12px] font-black" style={{ color: TC.text }}>{pl.meses} Meses</div>
               <div className="text-xl font-black my-0.5" style={{ fontFamily: TC.serif, color: colorPago }}>{fmtC(pl.pago)}<span className="text-[10px] font-bold ml-1" style={{ color: TC.mut }}>por mes</span></div>
               <div className="text-[10px]" style={{ color: TC.mut }}>Total a pagar: <b style={{ color: TC.text }}>{fmtC(pl.total)}</b></div>
