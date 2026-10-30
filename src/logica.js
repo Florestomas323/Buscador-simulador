@@ -1,5 +1,6 @@
 // Lógica pura del buscador y del simulador (sin interfaz), para poder probarla.
 import { CATALOGO, ESTADOS_IMPUESTO } from "./datos.js";
+import { PRECIOS } from "./precios.js";
 
 export const sinAcentos = (t) =>
   (t || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -173,3 +174,76 @@ export const fmtC = (n) =>
   "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export { ESTADOS_IMPUESTO };
+
+/* ══════════ LISTA DE PRECIOS Y PAQUETES ══════════ */
+export { PRECIOS };
+
+export const GRUPOS_PRECIOS = Array.from(new Set(PRECIOS.map((x) => x.g)));
+
+// Descuento por paquete (2 o más productos), sobre la suma de precios de lista antes de tax y envío
+export const DESCUENTOS_PAQUETE = [
+  { min: 4000, pct: 20 },
+  { min: 3000, pct: 15 },
+  { min: 2000, pct: 10 },
+  { min: 1000, pct: 5 },
+];
+export const pctPaquete = (suma, unidades) => {
+  if (unidades < 2) return 0;
+  const r = DESCUENTOS_PAQUETE.find((d) => suma >= d.min);
+  return r ? r.pct : 0;
+};
+
+/**
+ * Paquete: items = [{ p: precio, cant }]. El descuento va sobre el TOTAL de todos los productos sumados.
+ * El total del paquete se redondea al dólar de arriba ($2,428.20 → $2,429).
+ */
+export function calcularPaquete(items) {
+  const unidades = items.reduce((a, x) => a + (x.cant || 0), 0);
+  const suma = items.reduce((a, x) => a + (x.p || 0) * (x.cant || 0), 0);
+  const pct = pctPaquete(suma, unidades);
+  const total = suma > 0 ? Math.ceil(suma * (1 - pct / 100) - 1e-6) : 0;
+  const descuento = suma - total;
+  // Cuánto falta para el siguiente rango de descuento
+  const siguiente = [...DESCUENTOS_PAQUETE].reverse().find((d) => d.pct > pct);
+  const falta = siguiente ? Math.max(0, siguiente.min - suma) : 0;
+  return { unidades, suma, pct, descuento, total, siguiente: siguiente ? { pct: siguiente.pct, falta, min: siguiente.min } : null };
+}
+
+// Índice de búsqueda: nombre, grupo, códigos, etiquetas y lo que dice el catálogo de esos códigos
+const CAT_POR_CODIGO = Object.fromEntries(CATALOGO.map((p) => [p.c, p]));
+const INDICE_PRECIOS = PRECIOS.map((x, i) => {
+  const extra = x.cod.map((c) => { const p = CAT_POR_CODIGO[c.c]; return [c.c, c.l, p && p.n, p && p.f, p && p.k].filter(Boolean).join(" "); });
+  const hay = sinAcentos([x.n, x.g, ...extra, ...Object.values(x.pdf || {})].join(" "));
+  // Tipo del producto según el catálogo de su primer código: principal antes que accesorio, repuesto o material
+  const base = x.cod.length && CAT_POR_CODIGO[x.cod[0].c];
+  const nivel = base ? nivelProducto(base) : 0;
+  return { x, i, nivel, hay, hayC: compacto(hay), titulo: sinAcentos(x.n), codigos: x.cod.map((c) => sinAcentos(c.c)) };
+});
+
+export function buscarPrecios(q, grupo = "ALL") {
+  const toks = sinAcentos(q).trim().split(/\s+/)
+    .map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ""))
+    .filter(Boolean);
+  const out = INDICE_PRECIOS.filter(({ x, hay, hayC }) => {
+    if (grupo !== "ALL" && x.g !== grupo) return false;
+    return toks.every((t) => {
+      if (hay.includes(t)) return true;
+      const tc = compacto(t);
+      return tc !== t && tc.length > 0 && hayC.includes(tc);
+    });
+  });
+  // Orden: código exacto → producto principal antes que accesorios y material → el nombre empieza con lo buscado
+  //        → lo dice el nombre → solo en palabras clave → orden de la lista
+  const rel = (e) => {
+    if (!toks.length) return 3;
+    if (toks.length === 1 && e.codigos.includes(toks[0])) return 0;
+    if (e.titulo.startsWith(toks[0]) && toks.every((t) => e.titulo.includes(t))) return 1;
+    if (toks.every((t) => e.titulo.includes(t))) return 2;
+    return 3;
+  };
+  const exacto = (e) => (toks.length === 1 && e.codigos.includes(toks[0]) ? 0 : 1);
+  return out
+    .map((e) => ({ e, k: [exacto(e), e.nivel, rel(e), e.i] }))
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2] || a.k[3] - b.k[3])
+    .map(({ e }) => e.x);
+}
