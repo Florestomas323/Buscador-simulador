@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Search, Check, Star, Calculator, ScanSearch, AlertTriangle, Tag, Plus, Minus, Trash2, Gift, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { CATALOGO } from "./datos.js";
 import { CATEGORIAS, filtrarCatalogo, esPrincipal, calcular, amortizar, fmtC, ESTADOS_IMPUESTO, precioDesdeTotal, ENVIO_PCT, DEPOSITOS_SUGERIDOS,
-  PRECIOS, GRUPOS_PRECIOS, buscarPrecios, calcularPaquete, DESCUENTOS_PAQUETE } from "./logica.js";
+  PRECIOS, GRUPOS_PRECIOS, buscarPrecios, calcularPaquete, DESCUENTOS_PAQUETE, DESCUENTO_MAXIMO } from "./logica.js";
 
 const TC = {
   bg: "#f0f2f5", panel: "#ffffff", border: "#d0d4dc",
@@ -287,13 +287,13 @@ function ListaPrecios({ onFinanciar, activo }) {
             </div>
 
             {/* Rangos de descuento */}
-            <div className="grid grid-cols-4 gap-1.5 mt-4">
+            <div className="grid grid-cols-3 gap-1.5 mt-4">
               {[...DESCUENTOS_PAQUETE].reverse().map((d) => {
                 const on = pk.pct === d.pct;
                 return (
                   <div key={d.pct} className="rounded-lg py-1.5 text-center" style={on ? { background: TC.green, color: "#fff" } : { background: TC.bg, color: "#6b7280", border: "1px solid " + TC.border }}>
                     <div className="text-[14px] font-black leading-tight">{d.pct}%</div>
-                    <div className="text-[9px] font-bold">{d.pct === 20 ? "$4,000+" : `$${d.min.toLocaleString("en-US")}–${(d.min + 999).toLocaleString("en-US")}`}</div>
+                    <div className="text-[9px] font-bold">{d.max ? `$${d.min.toLocaleString("en-US")}–${d.max.toLocaleString("en-US")}` : `$${d.min.toLocaleString("en-US")} en adelante`}</div>
                   </div>
                 );
               })}
@@ -301,7 +301,7 @@ function ListaPrecios({ onFinanciar, activo }) {
             <div className="text-[11px] mt-2 font-bold" style={{ color: pk.unidades < 2 ? AMARILLO.texto : TC.green }}>
               {pk.unidades < 2 ? "Agrega otro producto: el descuento aplica con 2 o más productos"
                 : pk.siguiente && pk.siguiente.falta > 0 ? `Te faltan ${fmtC(pk.siguiente.falta)} para llegar al ${pk.siguiente.pct}% de descuento`
-                : pk.pct === 20 ? "¡Descuento máximo del 20% aplicado!" : ""}
+                : pk.pct === DESCUENTO_MAXIMO ? `¡Descuento máximo del ${DESCUENTO_MAXIMO}% aplicado!` : ""}
             </div>
 
             <div className="space-y-1 mt-3">
