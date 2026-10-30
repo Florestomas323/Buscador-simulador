@@ -309,7 +309,7 @@ function ListaPrecios({ onFinanciar, activo }) {
               <Fila l={`Descuento de paquete (${pk.pct}%)`} v={pk.descuento > 0 ? "− " + fmtC(pk.descuento) : fmtC(0)} pale />
               <Fila l="Precio del paquete" v={fmtC(pk.total)} strong pale />
             </div>
-            <div className="text-[10px] mt-1 text-center" style={{ color: TC.mut }}>El descuento se aplica sobre el total de todos los productos y se redondea al dólar de arriba · precios antes de tax y envío</div>
+            <div className="text-[10px] mt-1 text-center" style={{ color: TC.mut }}>El descuento se aplica sobre el total de todos los productos y el precio se redondea a la decena de arriba · precios antes de tax y envío</div>
 
             <button onClick={financiarPaquete} className="w-full mt-4 rounded-xl py-3 text-[14px] font-black text-white inline-flex items-center justify-center gap-2 transition active:scale-[.98]" style={{ background: TC.blue }}>
               <Calculator size={16} />Financiar este paquete

@@ -195,13 +195,14 @@ export const pctPaquete = (suma, unidades) => {
 
 /**
  * Paquete: items = [{ p: precio, cant }]. El descuento va sobre el TOTAL de todos los productos sumados.
- * El total del paquete se redondea al dólar de arriba ($2,428.20 → $2,429).
+ * Con descuento, el precio del paquete se redondea a la decena de arriba ($1,852.20 → $1,860).
+ * Sin descuento se deja la suma tal cual (no se cobra más que el precio de lista).
  */
 export function calcularPaquete(items) {
   const unidades = items.reduce((a, x) => a + (x.cant || 0), 0);
   const suma = items.reduce((a, x) => a + (x.p || 0) * (x.cant || 0), 0);
   const pct = pctPaquete(suma, unidades);
-  const total = suma > 0 ? Math.ceil(suma * (1 - pct / 100) - 1e-6) : 0;
+  const total = suma <= 0 ? 0 : pct ? Math.ceil((suma * (1 - pct / 100)) / 10 - 1e-6) * 10 : suma;
   const descuento = suma - total;
   // Cuánto falta para el siguiente rango de descuento
   const siguiente = [...DESCUENTOS_PAQUETE].reverse().find((d) => d.pct > pct);
