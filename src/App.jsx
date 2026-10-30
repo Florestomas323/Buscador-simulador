@@ -287,7 +287,7 @@ function ListaPrecios({ onFinanciar, activo }) {
             </div>
 
             {/* Rangos de descuento */}
-            <div className="grid grid-cols-3 gap-1.5 mt-4">
+            <div className="grid gap-1.5 mt-4" style={{ gridTemplateColumns: `repeat(${DESCUENTOS_PAQUETE.length}, minmax(0, 1fr))` }}>
               {[...DESCUENTOS_PAQUETE].reverse().map((d) => {
                 const on = pk.pct === d.pct;
                 return (
