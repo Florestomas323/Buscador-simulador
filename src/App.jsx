@@ -105,6 +105,8 @@ function BuscadorCodigos() {
 
 /* ══════════ LISTA DE PRECIOS Y PAQUETES ══════════ */
 const LIMITE_PRECIOS = 80;
+// Paquetes apagados por ahora: cambiar a true para volver a mostrar "Agregar al paquete" y la vista Paquete
+const MOSTRAR_PAQUETES = false;
 const PRECIO_POR_ID = Object.fromEntries(PRECIOS.map((x) => [x.id, x]));
 const AMARILLO = { fondo: "#fff8db", borde: "#e0b100", texto: "#8a6100" };
 
@@ -166,11 +168,11 @@ function TarjetaPrecio({ x, cant, copiado, onCopiar, onAgregar, onSimular }) {
           {x.piezas && <div>{x.piezas}</div>}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2 mt-2.5">
-        <button onClick={() => onAgregar(x.id)} className="inline-flex items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-black transition active:scale-95"
+      <div className={"grid gap-2 mt-2.5 " + (MOSTRAR_PAQUETES ? "grid-cols-2" : "grid-cols-1")}>
+        {MOSTRAR_PAQUETES && <button onClick={() => onAgregar(x.id)} className="inline-flex items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-black transition active:scale-95"
           style={cant ? { background: TC.green, color: "#fff", border: "2px solid " + TC.green } : { background: "#e9f7ef", color: TC.green, border: "2px solid #9fd8b6" }}>
           <Plus size={13} />{cant ? `En paquete (${cant})` : "Agregar al paquete"}
-        </button>
+        </button>}
         <button onClick={() => onSimular(x)} className="inline-flex items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-black transition active:scale-95"
           style={{ background: TC.bluePale, color: TC.blue, border: "2px solid " + TC.borderHi }}>
           <Calculator size={13} />Simular
@@ -210,15 +212,15 @@ function ListaPrecios({ onFinanciar, activo }) {
     <div className="space-y-3" style={{ paddingBottom: vista === "individual" && paquete.length && activo ? 76 : 0 }}>
       <div className="rounded-2xl p-5" style={{ background: TC.panel, border: "1px solid " + TC.border, boxShadow: TC.glow }}>
         <div className="text-lg font-bold" style={{ fontFamily: TC.serif, color: TC.blue }}>Lista de Precios</div>
-        <div className="text-xs mb-3" style={{ color: TC.mut }}>Precios de venta 2026 · antes de tax y envío</div>
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl mb-4" style={{ background: TC.bg, border: "1px solid " + TC.border }}>
+        <div className="text-xs mb-3" style={{ color: TC.mut }}>Precios de venta 2026 · antes de tax y envío · toca "Simular" para calcular el financiamiento</div>
+        {MOSTRAR_PAQUETES && <div className="grid grid-cols-2 gap-1 p-1 rounded-xl mb-4" style={{ background: TC.bg, border: "1px solid " + TC.border }}>
           <button onClick={() => setVista("individual")} className="rounded-lg py-2 text-[13px] font-black inline-flex items-center justify-center gap-1.5" style={seg(vista === "individual")}>
             <Tag size={14} />Precio individual
           </button>
           <button onClick={() => setVista("paquete")} className="rounded-lg py-2 text-[13px] font-black inline-flex items-center justify-center gap-1.5" style={seg(vista === "paquete")}>
             <Package size={14} />Paquete{pk.unidades ? ` (${pk.unidades})` : ""}
           </button>
-        </div>
+        </div>}
 
         {vista === "individual" && (<>
           <div className="relative mb-2">
@@ -250,7 +252,7 @@ function ListaPrecios({ onFinanciar, activo }) {
           </div>
         </>)}
 
-        {vista === "paquete" && (<>
+        {MOSTRAR_PAQUETES && vista === "paquete" && (<>
           {lineas.length === 0 ? (
             <div className="text-center py-10 rounded-xl" style={{ color: TC.mut, background: TC.bg }}>
               <Package size={30} strokeWidth={1.25} className="mx-auto mb-2 opacity-50" />
@@ -322,7 +324,7 @@ function ListaPrecios({ onFinanciar, activo }) {
       </div>
 
       {/* Barra del paquete mientras navegas la lista */}
-      {vista === "individual" && paquete.length > 0 && activo && (
+      {MOSTRAR_PAQUETES && vista === "individual" && paquete.length > 0 && activo && (
         <div className="fixed left-0 right-0 bottom-0 z-20 px-4" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
           <button onClick={() => { setVista("paquete"); try { window.scrollTo(0, 0); } catch (e) { /* sin scroll */ } }}
             className="max-w-2xl mx-auto w-full rounded-2xl px-4 py-3 flex items-center justify-between text-white" style={{ background: TC.green, boxShadow: TC.glowLg }}>
