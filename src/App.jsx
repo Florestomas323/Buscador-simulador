@@ -202,9 +202,7 @@ function SimuladorCompra() {
             <CampoDinero value={totalMostrar} onChange={cambiarTotal} activo={modoPrecio === "total"} />
             {totalImposible
               ? <div className="text-[11px] mt-1 font-bold" style={{ color: TC.red }}>El envío escrito a mano es mayor que el total; revisa el envío.</div>
-              : <Ayuda t={modoPrecio === "total"
-                  ? `Calculando hacia atrás: el total ya trae envío y tax de ${tasaTxt}, por eso el producto sale más bajo`
-                  : "Si el cliente te da el precio final, escríbelo aquí y se calcula el precio del producto"} />}
+              : modoPrecio === "total" && <Ayuda t={`Calculando hacia atrás: el total ya trae envío y tax de ${tasaTxt}, por eso el producto sale más bajo`} />}
           </div>
         </div>
         <div>
