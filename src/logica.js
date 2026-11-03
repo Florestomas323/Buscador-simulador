@@ -247,3 +247,10 @@ export function buscarPrecios(q, grupo = "ALL") {
     .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2] || a.k[3] - b.k[3])
     .map(({ e }) => e.x);
 }
+
+/* ══════════ LISTA DE PRECIOS POR ESTADO ══════════ */
+// Cada estado con su propia lista. Por ahora solo Texas tiene lista de precios cargada;
+// para agregar otro estado: { TX: PRECIOS, NV: PRECIOS_NV }.
+export const LISTAS_POR_ESTADO = { TX: PRECIOS };
+export const hayListaDePrecios = (estado) => Boolean(LISTAS_POR_ESTADO[estado]);
+export const ESTADO_INICIAL = "TX";

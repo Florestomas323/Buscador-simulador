@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
-import { Search, Check, Star, Calculator, ScanSearch, AlertTriangle, Tag, Plus, Minus, Trash2, Gift, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Search, Check, Star, Calculator, ScanSearch, AlertTriangle, Tag, Plus, Minus, Trash2, Gift, Package, ChevronDown, ChevronUp, MapPin } from "lucide-react";
 import { CATALOGO } from "./datos.js";
 import { CATEGORIAS, filtrarCatalogo, esPrincipal, calcular, amortizar, fmtC, ESTADOS_IMPUESTO, precioDesdeTotal, ENVIO_PCT, DEPOSITOS_SUGERIDOS,
-  PRECIOS, GRUPOS_PRECIOS, buscarPrecios, calcularPaquete, DESCUENTOS_PAQUETE, DESCUENTO_MAXIMO } from "./logica.js";
+  PRECIOS, GRUPOS_PRECIOS, buscarPrecios, calcularPaquete, DESCUENTOS_PAQUETE, DESCUENTO_MAXIMO,
+  hayListaDePrecios, ESTADO_INICIAL } from "./logica.js";
 
 const TC = {
   bg: "#f0f2f5", panel: "#ffffff", border: "#d0d4dc",
@@ -182,7 +183,7 @@ function TarjetaPrecio({ x, cant, copiado, onCopiar, onAgregar, onSimular }) {
   );
 }
 
-function ListaPrecios({ onFinanciar, activo }) {
+function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
   const [vista, setVista] = useState("individual"); // 'individual' | 'paquete'
   const [q, setQ] = useState("");
   const [grupo, setGrupo] = useState("ALL");
@@ -208,10 +209,37 @@ function ListaPrecios({ onFinanciar, activo }) {
   const seg = (on) => on ? { background: "#fff", color: TC.blue, boxShadow: TC.glow } : { color: "#5a5a5a" };
   const mostrar = items.slice(0, LIMITE_PRECIOS);
 
+  const nombreEstado = ESTADOS_IMPUESTO[estado] ? ESTADOS_IMPUESTO[estado][0] : estado;
+
+  // Estado sin lista de precios cargada: aviso y acceso al simulador
+  if (!hayListaDePrecios(estado)) return (
+    <div className="rounded-2xl p-5 text-center" style={{ background: TC.panel, border: "1px solid " + TC.border, boxShadow: TC.glow }}>
+      <div className="text-lg font-bold" style={{ fontFamily: TC.serif, color: TC.blue }}>Lista de Precios</div>
+      <div className="inline-flex items-center gap-1 text-[11px] font-black uppercase mt-1 px-2 py-0.5 rounded" style={{ background: TC.bluePale, color: TC.blueMid, letterSpacing: ".06em" }}>
+        <MapPin size={11} />{nombreEstado}
+      </div>
+      <div className="mx-auto my-5 w-14 h-14 rounded-full flex items-center justify-center" style={{ background: TC.bg }}>
+        <Tag size={26} strokeWidth={1.5} style={{ color: TC.mut }} />
+      </div>
+      <div className="text-[15px] font-black" style={{ color: TC.text }}>Lista de precios no disponible para {nombreEstado}</div>
+      <div className="text-xs mt-1.5 leading-relaxed" style={{ color: TC.mut }}>
+        Por ahora la lista de precios es solo para Texas. Puedes calcular el financiamiento en el Simulador escribiendo el precio a mano.
+      </div>
+      <button onClick={onIrSimulador} className="mt-5 w-full rounded-xl py-3 text-[14px] font-black text-white inline-flex items-center justify-center gap-2" style={{ background: TC.blue }}>
+        <Calculator size={16} />Ir al Simulador
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-3" style={{ paddingBottom: vista === "individual" && paquete.length && activo ? 76 : 0 }}>
       <div className="rounded-2xl p-5" style={{ background: TC.panel, border: "1px solid " + TC.border, boxShadow: TC.glow }}>
-        <div className="text-lg font-bold" style={{ fontFamily: TC.serif, color: TC.blue }}>Lista de Precios</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-lg font-bold" style={{ fontFamily: TC.serif, color: TC.blue }}>Lista de Precios</div>
+          <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2 py-0.5 rounded shrink-0" style={{ background: TC.bluePale, color: TC.blueMid, letterSpacing: ".06em" }}>
+            <MapPin size={11} />{nombreEstado}
+          </span>
+        </div>
         <div className="text-xs mb-3" style={{ color: TC.mut }}>Precios de venta 2026 · antes de tax y envío · toca "Simular" para calcular el financiamiento</div>
         {MOSTRAR_PAQUETES && <div className="grid grid-cols-2 gap-1 p-1 rounded-xl mb-4" style={{ background: TC.bg, border: "1px solid " + TC.border }}>
           <button onClick={() => setVista("individual")} className="rounded-lg py-2 text-[13px] font-black inline-flex items-center justify-center gap-1.5" style={seg(vista === "individual")}>
@@ -365,12 +393,11 @@ const Ayuda = ({ t }) => <div className="text-[11px] mt-1" style={{ color: TC.mu
 
 const ESTADOS_ORDEN = Object.entries(ESTADOS_IMPUESTO).sort((a, b) => a[1][0].localeCompare(b[1][0]));
 
-function SimuladorCompra({ carga }) {
+function SimuladorCompra({ carga, estado, setEstado }) {
   // Precio: se escribe el del producto O el total (con envío y taxes); el otro se calcula
   const [modoPrecio, setModoPrecio] = useState("producto"); // 'producto' | 'total'
   const [precioTxt, setPrecioTxt] = useState("");
   const [totalTxt, setTotalTxt] = useState("");
-  const [estado, setEstado] = useState("TX");
   const [envioTxt, setEnvioTxt] = useState("");
   const [envioManual, setEnvioManual] = useState(false);
   const [depPct, setDepPct] = useState("5");
@@ -401,11 +428,17 @@ function SimuladorCompra({ carga }) {
 
   const cambiarPrecio = (v) => { setPrecioTxt(v); setModoPrecio("producto"); setOrigen(""); };
   const cambiarTotal = (v) => { setTotalTxt(v); setModoPrecio("total"); setOrigen(""); };
-  // Al cambiar de estado se mantiene el PRECIO DEL PRODUCTO (el total sube o baja con el tax)
-  const cambiarEstado = (e) => {
-    if (modoPrecio === "total" && precioNum > 0) { setPrecioTxt(precioNum.toFixed(2)); setModoPrecio("producto"); }
-    setEstado(e);
-  };
+  // Al cambiar de estado (aquí o arriba) se mantiene el PRECIO DEL PRODUCTO (el total sube o baja con el tax)
+  const precioAnterior = useRef(precioNum);
+  const estadoAnterior = useRef(estado);
+  useEffect(() => {
+    if (estadoAnterior.current !== estado) {
+      if (modoPrecio === "total" && precioAnterior.current > 0) { setPrecioTxt(precioAnterior.current.toFixed(2)); setModoPrecio("producto"); }
+      estadoAnterior.current = estado;
+    }
+  }, [estado]);
+  useEffect(() => { precioAnterior.current = precioNum; });
+  const cambiarEstado = (e) => setEstado(e);
   // Si borran el envío, vuelve a calcularse solo al 5%
   const cambiarEnvio = (v) => {
     if (v === "") { setEnvioManual(false); setEnvioTxt(""); return; }
@@ -565,8 +598,19 @@ function SimuladorCompra({ carga }) {
 }
 
 /* ══════════ APP ══════════ */
+const CLAVE_ESTADO = "impact_estado";
+function leerEstadoGuardado() {
+  try { const e = window.localStorage.getItem(CLAVE_ESTADO); if (e && ESTADOS_IMPUESTO[e]) return e; } catch (err) { /* sin almacenamiento */ }
+  return ESTADO_INICIAL;
+}
+
 export default function App() {
   const [tab, setTab] = useState("buscador");
+  const [estado, setEstadoBase] = useState(leerEstadoGuardado);
+  const setEstado = (e) => {
+    setEstadoBase(e);
+    try { window.localStorage.setItem(CLAVE_ESTADO, e); } catch (err) { /* sin almacenamiento */ }
+  };
   const [carga, setCarga] = useState(null);
   const financiar = (precio, origen) => {
     setCarga({ precio, origen, n: Date.now() });
@@ -583,8 +627,23 @@ export default function App() {
     <div className="min-h-screen" style={{ background: TC.bg }}>
       <header className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: TC.blue, paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
         <div className="max-w-2xl mx-auto">
-          <div className="text-white text-xl font-bold leading-tight" style={{ fontFamily: TC.serif }}>Impact <span className="italic" style={{ color: "#9fbcf0" }}>Enterprises</span></div>
-          <div className="text-[10px] tracking-[0.2em] text-white/70 font-semibold uppercase mb-3">Códigos, Precios y Simulador</div>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <div className="text-white text-xl font-bold leading-tight" style={{ fontFamily: TC.serif }}>Impact <span className="italic" style={{ color: "#9fbcf0" }}>Enterprises</span></div>
+              <div className="text-[9px] tracking-[0.12em] text-white/70 font-semibold uppercase whitespace-nowrap">Códigos, Precios y Simulador</div>
+            </div>
+            {/* Estado para toda la app (Precios y Simulador) */}
+            <label className="relative shrink-0 mt-0.5">
+              <span className="sr-only">Estado</span>
+              <MapPin size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#9fbcf0" }} />
+              <select value={estado} onChange={(e) => setEstado(e.target.value)} aria-label="Estado"
+                className="appearance-none rounded-full pl-7 pr-7 py-1.5 text-[13px] font-black outline-none"
+                style={{ background: "rgba(255,255,255,.14)", color: "#fff", border: "1px solid rgba(255,255,255,.25)", maxWidth: 140 }}>
+                {ESTADOS_ORDEN.map(([k, [n]]) => <option key={k} value={k} style={{ color: "#111" }}>{n}</option>)}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#fff" }} />
+            </label>
+          </div>
           <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "rgba(255,255,255,.12)" }}>
             <Tab id="buscador" icon={ScanSearch} t="Buscador" />
             <Tab id="precios" icon={Tag} t="Precios" />
@@ -595,8 +654,8 @@ export default function App() {
       <main className="max-w-2xl mx-auto px-4 py-4" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
         {/* Las pestañas quedan montadas para no perder lo escrito ni el paquete al cambiar */}
         <div style={{ display: tab === "buscador" ? "block" : "none" }}><BuscadorCodigos /></div>
-        <div style={{ display: tab === "precios" ? "block" : "none" }}><ListaPrecios onFinanciar={financiar} activo={tab === "precios"} /></div>
-        <div style={{ display: tab === "simulador" ? "block" : "none" }}><SimuladorCompra carga={carga} /></div>
+        <div style={{ display: tab === "precios" ? "block" : "none" }}><ListaPrecios onFinanciar={financiar} activo={tab === "precios"} estado={estado} onIrSimulador={() => setTab("simulador")} /></div>
+        <div style={{ display: tab === "simulador" ? "block" : "none" }}><SimuladorCompra carga={carga} estado={estado} setEstado={setEstado} /></div>
       </main>
     </div>
   );
