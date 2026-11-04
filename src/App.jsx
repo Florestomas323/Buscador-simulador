@@ -372,33 +372,37 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
                 {(promo || promoPct > 0) && <button onClick={quitarPromo} className="text-[11px] font-bold" style={{ color: TC.red }}>Quitar promoción</button>}
               </div>
               <div className="text-[11px] mt-0.5 mb-2" style={{ color: TC.mut }}>Elígela antes de mostrarle el paquete al cliente</div>
-              <div className="flex flex-wrap gap-1.5">
-                {[...PROMOCIONES, "__otro"].map((n) => {
-                  const on = promo === n;
-                  return (
-                    <button key={n} onClick={() => setPromo(on ? "" : n)} className="px-3 py-1.5 rounded-full text-[11px] font-bold transition active:scale-95"
-                      style={on ? { background: TC.green, color: "#fff", border: "1.5px solid " + TC.green } : { background: "#fff", color: "#4b5563", border: "1.5px solid " + TC.border }}>
-                      {n === "__otro" ? "Otro…" : n}
-                    </button>
-                  );
-                })}
+              <div className="space-y-2.5">
+                <div>
+                  <label className="block text-[11px] font-black mb-1" style={{ color: TC.text }}>Especial</label>
+                  <div className="relative">
+                    <select value={promo} onChange={(e) => setPromo(e.target.value)} aria-label="Especial"
+                      className="appearance-none w-full rounded-lg pl-3 pr-8 py-2.5 text-[15px] font-bold outline-none"
+                      style={{ ...inp, borderColor: promo ? TC.green : TC.border, color: promo ? TC.green : "#6b7280" }}>
+                      <option value="">Elegir especial…</option>
+                      {PROMOCIONES.map((n) => <option key={n} value={n}>{n}</option>)}
+                      <option value="__otro">Otro (escribir)…</option>
+                    </select>
+                    <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: promo ? TC.green : TC.mut }} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black mb-1" style={{ color: TC.text }}>Descuento</label>
+                  <div className="relative">
+                    <select value={promoPct} onChange={(e) => setPromoPct(Number(e.target.value))} aria-label="Porcentaje de descuento"
+                      className="appearance-none w-full rounded-lg pl-3 pr-8 py-2.5 text-[15px] font-black outline-none"
+                      style={{ ...inp, borderColor: promoPct ? TC.green : TC.border, color: promoPct ? TC.green : "#6b7280" }}>
+                      <option value={0}>0%</option>
+                      {PORCENTAJES_PROMO.map((pc) => <option key={pc} value={pc}>{pc}%</option>)}
+                    </select>
+                    <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: promoPct ? TC.green : TC.mut }} />
+                  </div>
+                </div>
               </div>
               {promo === "__otro" && (
                 <input value={promoOtro} onChange={(e) => setPromoOtro(e.target.value)} placeholder="Ej. Especial día de las madres" maxLength={40}
                   className="w-full mt-2 rounded-lg px-3 py-2 text-base font-semibold outline-none" style={inp} />
               )}
-              <div className="text-[11px] font-black mt-3 mb-1.5" style={{ color: TC.text }}>Porcentaje de descuento</div>
-              <div className="grid grid-cols-6 gap-1.5">
-                {PORCENTAJES_PROMO.map((pc) => {
-                  const on = promoPct === pc;
-                  return (
-                    <button key={pc} onClick={() => setPromoPct(on ? 0 : pc)} className="rounded-lg py-2 text-[13px] font-black transition active:scale-95"
-                      style={on ? { background: TC.green, color: "#fff", border: "2px solid " + TC.green } : { background: "#fff", color: TC.green, border: "2px solid #9fd8b6" }}>
-                      {pc}%
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             <div className="space-y-1 mt-3">
@@ -438,9 +442,9 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
 /* ══════════ SIMULADOR DE COMPRA ══════════ */
 function Fila({ l, v, strong, pale, neg }) {
   return (
-    <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={pale ? { background: TC.bluePale } : {}}>
-      <span className={"text-[13px] " + (strong ? "font-black" : "font-semibold")} style={{ color: strong ? TC.blue : "#5a5a5a" }}>{l}</span>
-      <span className={"text-[14px] " + (strong ? "font-black" : "font-bold")} style={{ color: neg ? TC.red : strong ? TC.blue : TC.text }}>{v}</span>
+    <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg" style={pale ? { background: TC.bluePale } : {}}>
+      <span className={"text-[13px] min-w-0 " + (strong ? "font-black" : "font-semibold")} style={{ color: strong ? TC.blue : "#5a5a5a" }}>{l}</span>
+      <span className={"text-[14px] whitespace-nowrap shrink-0 " + (strong ? "font-black" : "font-bold")} style={{ color: neg ? TC.red : strong ? TC.blue : TC.text }}>{v}</span>
     </div>
   );
 }
