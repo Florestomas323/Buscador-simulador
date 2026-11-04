@@ -181,32 +181,35 @@ export { PRECIOS };
 export const GRUPOS_PRECIOS = Array.from(new Set(PRECIOS.map((x) => x.g)));
 
 // Descuento por paquete (2 o más productos), sobre la suma de precios de lista antes de tax y envío
-export const DESCUENTOS_PAQUETE = [
-  { min: 3000, max: null, pct: 10 },
-  { min: 1000, max: 2999, pct: 5 },
+// Promociones que el vendedor elige antes de mostrarle el paquete al cliente
+export const PROMOCIONES = [
+  "Especial clientes nuevos",
+  "Especial clientes agregados",
+  "Especial de otoño",
+  "Especial navideño",
+  "Especial fin de año",
 ];
-export const DESCUENTO_MAXIMO = Math.max(...DESCUENTOS_PAQUETE.map((d) => d.pct));
-export const pctPaquete = (suma, unidades) => {
-  if (unidades < 2) return 0;
-  const r = DESCUENTOS_PAQUETE.find((d) => suma >= d.min);
-  return r ? r.pct : 0;
-};
+export const PORCENTAJES_PROMO = [5, 10, 15, 20, 25, 30];
 
 /**
- * Paquete: items = [{ p: precio, cant }]. El descuento va sobre el TOTAL de todos los productos sumados.
- * Con descuento, el precio del paquete se redondea a la decena de arriba ($1,852.20 → $1,860).
- * Sin descuento se deja la suma tal cual (no se cobra más que el precio de lista).
+ * Paquete: items = [{ p: precio, cant }] y pct = % de la promoción elegida (0 = sin promoción).
+ * Aplica desde 1 producto. El descuento va sobre el TOTAL de todos los productos sumados.
+ * Con descuento, el precio se redondea a la decena de arriba ($1,852.20 → $1,860); si esa decena
+ * llegara al precio de lista (productos chicos), se redondea solo al dólar de arriba ($27.55 → $28).
+ * Sin promoción se deja la suma tal cual.
  */
-export function calcularPaquete(items) {
+export function calcularPaquete(items, pct = 0) {
   const unidades = items.reduce((a, x) => a + (x.cant || 0), 0);
   const suma = items.reduce((a, x) => a + (x.p || 0) * (x.cant || 0), 0);
-  const pct = pctPaquete(suma, unidades);
-  const total = suma <= 0 ? 0 : pct ? Math.ceil((suma * (1 - pct / 100)) / 10 - 1e-6) * 10 : suma;
-  const descuento = suma - total;
-  // Cuánto falta para el siguiente rango de descuento
-  const siguiente = [...DESCUENTOS_PAQUETE].reverse().find((d) => d.pct > pct);
-  const falta = siguiente ? Math.max(0, siguiente.min - suma) : 0;
-  return { unidades, suma, pct, descuento, total, siguiente: siguiente ? { pct: siguiente.pct, falta, min: siguiente.min } : null };
+  const p = PORCENTAJES_PROMO.includes(pct) ? pct : 0;
+  let total = suma;
+  if (suma > 0 && p) {
+    const exacto = suma * (1 - p / 100);
+    const decena = Math.ceil(exacto / 10 - 1e-6) * 10;
+    total = decena < suma ? decena : Math.ceil(exacto - 1e-6);
+  }
+  if (suma <= 0) total = 0;
+  return { unidades, suma, pct: p, descuento: suma - total, total };
 }
 
 // Índice de búsqueda: nombre, grupo, códigos, etiquetas y lo que dice el catálogo de esos códigos

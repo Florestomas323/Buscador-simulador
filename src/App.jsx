@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Search, Check, Star, Calculator, ScanSearch, AlertTriangle, Tag, Plus, Minus, Trash2, Gift, Package, ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { Search, Check, Star, Calculator, ScanSearch, AlertTriangle, Tag, Plus, Minus, Trash2, Gift, Package, ChevronDown, ChevronUp, MapPin, Sparkles, Eye, Pencil } from "lucide-react";
 import { CATALOGO } from "./datos.js";
 import { CATEGORIAS, filtrarCatalogo, esPrincipal, calcular, amortizar, fmtC, ESTADOS_IMPUESTO, precioDesdeTotal, ENVIO_PCT, DEPOSITOS_SUGERIDOS,
-  PRECIOS, GRUPOS_PRECIOS, buscarPrecios, calcularPaquete, DESCUENTOS_PAQUETE, DESCUENTO_MAXIMO,
+  PRECIOS, GRUPOS_PRECIOS, buscarPrecios, calcularPaquete, PROMOCIONES, PORCENTAJES_PROMO,
   hayListaDePrecios, ESTADO_INICIAL } from "./logica.js";
 
 const TC = {
@@ -106,8 +106,8 @@ function BuscadorCodigos() {
 
 /* ══════════ LISTA DE PRECIOS Y PAQUETES ══════════ */
 const LIMITE_PRECIOS = 80;
-// Paquetes apagados por ahora: cambiar a true para volver a mostrar "Agregar al paquete" y la vista Paquete
-const MOSTRAR_PAQUETES = false;
+// Paquetes con promoción elegida por el vendedor (false = ocultar "Agregar al paquete" y la vista Paquete)
+const MOSTRAR_PAQUETES = true;
 const PRECIO_POR_ID = Object.fromEntries(PRECIOS.map((x) => [x.id, x]));
 const AMARILLO = { fondo: "#fff8db", borde: "#e0b100", texto: "#8a6100" };
 
@@ -189,10 +189,17 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
   const [grupo, setGrupo] = useState("ALL");
   const [paquete, setPaquete] = useState([]); // [{ id, cant }]
   const [copiado, setCopiado] = useState(null);
+  // Promoción: la elige el vendedor antes de mostrarle el paquete al cliente
+  const [promo, setPromo] = useState("");        // nombre de la lista, "__otro" o "" (ninguno)
+  const [promoOtro, setPromoOtro] = useState(""); // texto cuando eligen "Otro"
+  const [promoPct, setPromoPct] = useState(0);    // 0 = sin descuento
+  const [modoCliente, setModoCliente] = useState(false);
 
   const items = useMemo(() => buscarPrecios(q, grupo), [q, grupo]);
   const lineas = paquete.map((l) => ({ ...PRECIO_POR_ID[l.id], cant: l.cant }));
-  const pk = calcularPaquete(lineas);
+  const pk = calcularPaquete(lineas, promoPct);
+  const nombrePromo = (promo === "__otro" ? promoOtro.trim() : promo) || (pk.pct ? "Descuento especial" : "");
+  const quitarPromo = () => { setPromo(""); setPromoOtro(""); setPromoPct(0); };
   const enPaquete = (id) => (paquete.find((l) => l.id === id) || {}).cant || 0;
 
   const copiar = (c) => copiarTexto(c, () => { setCopiado(c); setTimeout(() => setCopiado((x) => (x === c ? null : x)), 1600); });
@@ -201,7 +208,8 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
   const quitar = (id) => setPaquete((ps) => ps.filter((l) => l.id !== id));
   const simular = (x) => onFinanciar(x.p, "Desde Lista de Precios: " + x.n);
   const financiarPaquete = () => onFinanciar(pk.total,
-    `Paquete de ${pk.unidades} producto${pk.unidades !== 1 ? "s" : ""}` + (pk.pct ? ` · ${pk.pct}% de descuento` : ""));
+    `Paquete de ${pk.unidades} producto${pk.unidades !== 1 ? "s" : ""}` + (pk.pct ? ` · ${nombrePromo} ${pk.pct}%` : ""));
+  const irAlPaquete = () => { setVista("paquete"); try { window.scrollTo(0, 0); } catch (e) { /* sin scroll */ } };
 
   const chip = (on) => on
     ? { background: TC.blueMid, color: "#fff", border: "1.5px solid " + TC.blueMid }
@@ -240,8 +248,8 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
             <MapPin size={11} />{nombreEstado}
           </span>
         </div>
-        <div className="text-xs mb-3" style={{ color: TC.mut }}>Precios de venta 2026 · antes de tax y envío · toca "Simular" para calcular el financiamiento</div>
-        {MOSTRAR_PAQUETES && <div className="grid grid-cols-2 gap-1 p-1 rounded-xl mb-4" style={{ background: TC.bg, border: "1px solid " + TC.border }}>
+        <div className="text-xs mb-3" style={{ color: TC.mut }}>{vista === "paquete" && modoCliente ? "Precios de venta 2026" : 'Precios de venta 2026 · antes de tax y envío · toca "Simular" para calcular el financiamiento'}</div>
+        {MOSTRAR_PAQUETES && !(vista === "paquete" && modoCliente) && <div className="grid grid-cols-2 gap-1 p-1 rounded-xl mb-4" style={{ background: TC.bg, border: "1px solid " + TC.border }}>
           <button onClick={() => setVista("individual")} className="rounded-lg py-2 text-[13px] font-black inline-flex items-center justify-center gap-1.5" style={seg(vista === "individual")}>
             <Tag size={14} />Precio individual
           </button>
@@ -285,10 +293,51 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
             <div className="text-center py-10 rounded-xl" style={{ color: TC.mut, background: TC.bg }}>
               <Package size={30} strokeWidth={1.25} className="mx-auto mb-2 opacity-50" />
               <div className="text-sm font-bold">El paquete está vacío</div>
-              <div className="text-xs mt-1">Agrega 2 o más productos desde "Precio individual"</div>
-              <button onClick={() => setVista("individual")} className="mt-3 px-4 py-2 rounded-lg text-[12px] font-black text-white" style={{ background: TC.blueMid }}>Ir a la lista de precios</button>
+              <div className="text-xs mt-1">Agrega productos desde "Precio individual"</div>
+              <button onClick={() => { setModoCliente(false); setVista("individual"); }} className="mt-3 px-4 py-2 rounded-lg text-[12px] font-black text-white" style={{ background: TC.blueMid }}>Ir a la lista de precios</button>
             </div>
-          ) : (<>
+          ) : modoCliente ? (<>
+            {/* ── VISTA PARA EL CLIENTE: sin controles ── */}
+            {pk.pct > 0 && (
+              <div className="rounded-2xl px-4 py-4 text-center text-white mb-3" style={{ background: "linear-gradient(135deg, #1d8a4f 0%, #136b3b 100%)", boxShadow: TC.glowLg }}>
+                <div className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] opacity-90"><Sparkles size={12} />Promoción</div>
+                <div className="text-2xl font-bold leading-tight mt-1" style={{ fontFamily: TC.serif }}>{nombrePromo}</div>
+                <div className="inline-block mt-2 px-3 py-1 rounded-full text-[13px] font-black" style={{ background: "rgba(255,255,255,.18)" }}>{pk.pct}% de descuento</div>
+              </div>
+            )}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid " + TC.border }}>
+              {lineas.map((x) => (
+                <div key={x.id} className="px-3 py-2.5 bg-white flex items-start justify-between gap-3" style={{ borderBottom: "1px solid " + TC.bg }}>
+                  <div className="text-[13px] font-bold leading-snug" style={{ color: TC.text }}>{x.cant > 1 && <span style={{ color: TC.blueMid }}>{x.cant} × </span>}{x.n}</div>
+                  <div className="text-[13px] font-black shrink-0" style={{ color: TC.text }}>{fmtC(x.p * x.cant)}</div>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1 mt-3">
+              {pk.pct > 0 ? (<>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="text-[13px] font-semibold" style={{ color: "#5a5a5a" }}>Precio regular</span>
+                  <span className="text-[14px] font-bold line-through" style={{ color: TC.mut }}>{fmtC(pk.suma)}</span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "#e9f7ef" }}>
+                  <span className="text-[13px] font-black" style={{ color: TC.green }}>Tu ahorro</span>
+                  <span className="text-[14px] font-black" style={{ color: TC.green }}>− {fmtC(pk.descuento)}</span>
+                </div>
+              </>) : null}
+              <div className="flex items-center justify-between px-3 py-3 rounded-lg" style={{ background: TC.bluePale }}>
+                <span className="text-[14px] font-black" style={{ color: TC.blue }}>{pk.pct > 0 ? "Precio especial" : "Precio del paquete"}</span>
+                <span className="text-2xl font-black" style={{ fontFamily: TC.serif, color: TC.blue }}>{fmtC(pk.total)}</span>
+              </div>
+            </div>
+            <div className="text-[10px] mt-1 text-center" style={{ color: TC.mut }}>Precios antes de tax y envío</div>
+            <button onClick={financiarPaquete} className="w-full mt-4 rounded-xl py-3 text-[14px] font-black text-white inline-flex items-center justify-center gap-2 transition active:scale-[.98]" style={{ background: TC.blue }}>
+              <Calculator size={16} />Ver planes de pago
+            </button>
+            <button onClick={() => setModoCliente(false)} className="w-full mt-3 py-1.5 text-[11px] font-bold inline-flex items-center justify-center gap-1" style={{ color: TC.mut }}>
+              <Pencil size={11} />Volver a editar
+            </button>
+          </>) : (<>
+            {/* ── VISTA DEL VENDEDOR: productos, promoción y totales ── */}
             <div className="rounded-xl overflow-hidden" style={{ border: "1px solid " + TC.border }}>
               {lineas.map((x) => (
                 <div key={x.id} className="px-3 py-3 bg-white" style={{ borderBottom: "1px solid " + TC.bg }}>
@@ -297,7 +346,7 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
                       <div className="text-[13px] font-bold leading-snug" style={{ color: TC.text }}>{x.n}</div>
                       <div className="mt-1"><Codigos cod={x.cod} copiado={copiado} onCopiar={copiar} /></div>
                     </div>
-                    <button onClick={() => quitar(x.id)} aria-label="Quitar" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: TC.red }}>
+                    <button onClick={() => quitar(x.id)} aria-label="Quitar producto" className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: TC.red }}>
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -316,35 +365,56 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
               ))}
             </div>
 
-            {/* Rangos de descuento */}
-            <div className="grid gap-1.5 mt-4" style={{ gridTemplateColumns: `repeat(${DESCUENTOS_PAQUETE.length}, minmax(0, 1fr))` }}>
-              {[...DESCUENTOS_PAQUETE].reverse().map((d) => {
-                const on = pk.pct === d.pct;
-                return (
-                  <div key={d.pct} className="rounded-lg py-1.5 text-center" style={on ? { background: TC.green, color: "#fff" } : { background: TC.bg, color: "#6b7280", border: "1px solid " + TC.border }}>
-                    <div className="text-[14px] font-black leading-tight">{d.pct}%</div>
-                    <div className="text-[9px] font-bold">{d.max ? `$${d.min.toLocaleString("en-US")}–${d.max.toLocaleString("en-US")}` : `$${d.min.toLocaleString("en-US")} en adelante`}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="text-[11px] mt-2 font-bold" style={{ color: pk.unidades < 2 ? AMARILLO.texto : TC.green }}>
-              {pk.unidades < 2 ? "Agrega otro producto: el descuento aplica con 2 o más productos"
-                : pk.siguiente && pk.siguiente.falta > 0 ? `Te faltan ${fmtC(pk.siguiente.falta)} para llegar al ${pk.siguiente.pct}% de descuento`
-                : pk.pct === DESCUENTO_MAXIMO ? `¡Descuento máximo del ${DESCUENTO_MAXIMO}% aplicado!` : ""}
+            {/* Promoción */}
+            <div className="rounded-xl p-3 mt-4" style={{ background: TC.bg, border: "1px solid " + TC.border }}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[13px] font-black inline-flex items-center gap-1.5" style={{ color: TC.green }}><Sparkles size={14} />Promoción</div>
+                {(promo || promoPct > 0) && <button onClick={quitarPromo} className="text-[11px] font-bold" style={{ color: TC.red }}>Quitar promoción</button>}
+              </div>
+              <div className="text-[11px] mt-0.5 mb-2" style={{ color: TC.mut }}>Elígela antes de mostrarle el paquete al cliente</div>
+              <div className="flex flex-wrap gap-1.5">
+                {[...PROMOCIONES, "__otro"].map((n) => {
+                  const on = promo === n;
+                  return (
+                    <button key={n} onClick={() => setPromo(on ? "" : n)} className="px-3 py-1.5 rounded-full text-[11px] font-bold transition active:scale-95"
+                      style={on ? { background: TC.green, color: "#fff", border: "1.5px solid " + TC.green } : { background: "#fff", color: "#4b5563", border: "1.5px solid " + TC.border }}>
+                      {n === "__otro" ? "Otro…" : n}
+                    </button>
+                  );
+                })}
+              </div>
+              {promo === "__otro" && (
+                <input value={promoOtro} onChange={(e) => setPromoOtro(e.target.value)} placeholder="Ej. Especial día de las madres" maxLength={40}
+                  className="w-full mt-2 rounded-lg px-3 py-2 text-base font-semibold outline-none" style={inp} />
+              )}
+              <div className="text-[11px] font-black mt-3 mb-1.5" style={{ color: TC.text }}>Porcentaje de descuento</div>
+              <div className="grid grid-cols-6 gap-1.5">
+                {PORCENTAJES_PROMO.map((pc) => {
+                  const on = promoPct === pc;
+                  return (
+                    <button key={pc} onClick={() => setPromoPct(on ? 0 : pc)} className="rounded-lg py-2 text-[13px] font-black transition active:scale-95"
+                      style={on ? { background: TC.green, color: "#fff", border: "2px solid " + TC.green } : { background: "#fff", color: TC.green, border: "2px solid #9fd8b6" }}>
+                      {pc}%
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-1 mt-3">
               <Fila l={`Suma de ${pk.unidades} producto${pk.unidades !== 1 ? "s" : ""}`} v={fmtC(pk.suma)} />
-              <Fila l={`Descuento de paquete (${pk.pct}%)`} v={pk.descuento > 0 ? "− " + fmtC(pk.descuento) : fmtC(0)} pale />
+              <Fila l={pk.pct ? `${nombrePromo} (${pk.pct}%)` : "Sin promoción"} v={pk.descuento > 0 ? "− " + fmtC(pk.descuento) : fmtC(0)} pale />
               <Fila l="Precio del paquete" v={fmtC(pk.total)} strong pale />
             </div>
-            <div className="text-[10px] mt-1 text-center" style={{ color: TC.mut }}>El descuento se aplica sobre el total de todos los productos y el precio se redondea a la decena de arriba · precios antes de tax y envío</div>
+            <div className="text-[10px] mt-1 text-center" style={{ color: TC.mut }}>El descuento se aplica sobre el total y el precio se redondea a la decena de arriba · precios antes de tax y envío</div>
 
-            <button onClick={financiarPaquete} className="w-full mt-4 rounded-xl py-3 text-[14px] font-black text-white inline-flex items-center justify-center gap-2 transition active:scale-[.98]" style={{ background: TC.blue }}>
+            <button onClick={() => { setModoCliente(true); try { window.scrollTo(0, 0); } catch (e) { /* sin scroll */ } }} className="w-full mt-4 rounded-xl py-3 text-[14px] font-black text-white inline-flex items-center justify-center gap-2 transition active:scale-[.98]" style={{ background: TC.green }}>
+              <Eye size={16} />Mostrar al cliente
+            </button>
+            <button onClick={financiarPaquete} className="w-full mt-2 rounded-xl py-3 text-[14px] font-black text-white inline-flex items-center justify-center gap-2 transition active:scale-[.98]" style={{ background: TC.blue }}>
               <Calculator size={16} />Financiar este paquete
             </button>
-            <button onClick={() => setPaquete([])} className="w-full mt-2 rounded-xl py-2.5 text-[12px] font-black inline-flex items-center justify-center gap-1.5" style={{ background: "#fff", color: TC.red, border: "1.5px solid #fecaca" }}>
+            <button onClick={() => { setPaquete([]); quitarPromo(); }} className="w-full mt-2 rounded-xl py-2.5 text-[12px] font-black inline-flex items-center justify-center gap-1.5" style={{ background: "#fff", color: TC.red, border: "1.5px solid #fecaca" }}>
               <Trash2 size={13} />Vaciar paquete
             </button>
           </>)}
@@ -354,7 +424,7 @@ function ListaPrecios({ onFinanciar, activo, estado, onIrSimulador }) {
       {/* Barra del paquete mientras navegas la lista */}
       {MOSTRAR_PAQUETES && vista === "individual" && paquete.length > 0 && activo && (
         <div className="fixed left-0 right-0 bottom-0 z-20 px-4" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-          <button onClick={() => { setVista("paquete"); try { window.scrollTo(0, 0); } catch (e) { /* sin scroll */ } }}
+          <button onClick={irAlPaquete}
             className="max-w-2xl mx-auto w-full rounded-2xl px-4 py-3 flex items-center justify-between text-white" style={{ background: TC.green, boxShadow: TC.glowLg }}>
             <span className="inline-flex items-center gap-2 text-[13px] font-black"><Package size={16} />Paquete · {pk.unidades} producto{pk.unidades !== 1 ? "s" : ""}{pk.pct ? ` · ${pk.pct}%` : ""}</span>
             <span className="text-[15px] font-black">{fmtC(pk.total)} ›</span>
