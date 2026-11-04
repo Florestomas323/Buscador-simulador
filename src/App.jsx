@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Search, Check, Star, Calculator, ScanSearch, AlertTriangle, Tag, Plus, Minus, Trash2, Gift, Package, ChevronDown, ChevronUp, MapPin, Sparkles, Eye, Pencil } from "lucide-react";
+import { Analytics } from "@vercel/analytics/react";
 import { CATALOGO } from "./datos.js";
 import { CATEGORIAS, filtrarCatalogo, esPrincipal, calcular, amortizar, fmtC, ESTADOS_IMPUESTO, precioDesdeTotal, ENVIO_PCT, DEPOSITOS_SUGERIDOS,
   PRECIOS, GRUPOS_PRECIOS, buscarPrecios, calcularPaquete, PROMOCIONES, PORCENTAJES_PROMO,
@@ -731,6 +732,7 @@ export default function App() {
         <div style={{ display: tab === "precios" ? "block" : "none" }}><ListaPrecios onFinanciar={financiar} activo={tab === "precios"} estado={estado} onIrSimulador={() => setTab("simulador")} /></div>
         <div style={{ display: tab === "simulador" ? "block" : "none" }}><SimuladorCompra carga={carga} estado={estado} setEstado={setEstado} /></div>
       </main>
+      <Analytics />
     </div>
   );
 }
